@@ -261,9 +261,14 @@ class LdaSampler(object):
 
 
         for it in xrange(maxiter):
-            print it
+            if it % 500 == 0:
+                print it
+            else:
+                pass
+
+            #print it
             for d in xrange(n_docs):
-                print d
+                #print d
                 #document-word level parameters
                 for i, v in enumerate(dtm_to_words(DTM[d, :])):
                     # i is a number between 0 and doc_length-1
