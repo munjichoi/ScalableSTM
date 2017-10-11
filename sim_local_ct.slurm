@@ -15,6 +15,6 @@ echo Running on host $(hostname)
 echo Time is $(date)
 echo SLURM_NODES are $(echo ${SLURM_NODELIST})
 echo '-------------------------------'
-echo -e '\n\n'
+echo -e '\n'
 
 srun STM_gibbs_exeriment.py
