@@ -12,10 +12,11 @@ from pypolyagamma import PyPolyaGamma
 import cPickle
 import pdb
 
-D = 200 	#number of documents
-K = 10 		#number of topics
-P = 4		#number of covariates
-V = 100		#number of vocabularies
+
+######### See the bottom lines for simulation ##########
+#  You also need to specify directory path to save the results
+
+
 
 
 def gen_documents(N_documents, N_topics, N_covariates, N_voca):
@@ -26,7 +27,7 @@ def gen_documents(N_documents, N_topics, N_covariates, N_voca):
 	beta = 3
 	
 	X = np.random.normal(0,1, N_documents*N_covariates).reshape((N_documents, N_covariates))
-	Nd = np.random.poisson(200, size=N_documents)
+	Nd = np.random.poisson(1000, size=N_documents)
 
 	#Global Parameters
 	Sigma = sp.stats.invwishart.rvs(df=nu, scale=Psi, size=1) # covariance matrix
@@ -114,7 +115,7 @@ class LdaSampler(object):
 
         
         # initial values for nu and tau
-        self.nu = self.n_topics # df for wishart 
+        self.nu = self.n_topics + 5# df for wishart 
         
         # initial values for the global parameter Sigma (covariance matrix)    
         self.Sigma = sp.stats.invwishart.rvs(df=self.nu, scale=self.psi, size=1) # covariance matrix
@@ -187,13 +188,16 @@ class LdaSampler(object):
     def _conditional_dist_logitnormal(self, d, k):
         """
         Conditional distribution of eta_dk (size of k-1 = kth elements is fixed to be zero)
+        This part is applied to k in (0~n_topics-2)
         """
         
     	XB = np.dot(self.X, self.B)
-    	eta_d_k = self.eta[d, np.arange(self.n_topics-1)!=k]
+    	eta_d_k = self.eta[d, np.arange(self.n_topics)!=k]
+        #remove last column with zero
+        eta_d_k = eta_d_k[np.arange(len(eta_d_k)-1)]
     	#conditional dist of multivariate normal
-    	sigmasq_k = self.Sigma_inv[k,k]
-    	mu_dk = XB[d, k] - 1/sigmasq_k*\
+    	sigmasq_k = 1/self.Sigma_inv[k,k]
+    	mu_dk = XB[d, k] - sigmasq_k*\
     		np.dot(self.Sigma_inv[np.arange(self.n_topics-1)!=k, np.arange(self.n_topics-1)!=k], eta_d_k - XB[d, np.arange(self.n_topics-1)!=k])
     	kappa_dk = self.ndk[d,k] - self.nd[d]/2
     	zeta_dk =np.log(sum(np.exp(eta_d_k))) 
@@ -204,8 +208,10 @@ class LdaSampler(object):
 
     	# Polyagamma parameters
     	rho_dk = self.eta[d,k] - zeta_dk
-    
-    	return {"tausq_dk":tausq_dk, "gamma_dk":gamma_dk, "rho_dk":rho_dk}
+        
+        return {"tausq_dk":tausq_dk, "gamma_dk":gamma_dk, "rho_dk":rho_dk, \
+        "eta_d_k":eta_d_k, "mu_dk":mu_dk, "kappa_dk":kappa_dk, "zeta_dk":zeta_dk}
+        
     	# Don't forget to append kth element of eta_dk with zero
 
 
@@ -255,7 +261,9 @@ class LdaSampler(object):
 
 
         for it in xrange(maxiter):
+            print it
             for d in xrange(n_docs):
+                print d
                 #document-word level parameters
                 for i, v in enumerate(dtm_to_words(DTM[d, :])):
                     # i is a number between 0 and doc_length-1
@@ -272,7 +280,7 @@ class LdaSampler(object):
                     self.topics[(d,i)] = z
 
                 #document-topic level parameters
-                for k in xrange(self.n_topics-1):                    
+                for k in xrange(self.n_topics-2):                    
                 #update eta_dk, lambda_dk
                     logitnormal = self._conditional_dist_logitnormal(d, k)
                     self.eta[d, k] = np.random.normal(logitnormal["gamma_dk"], logitnormal["tausq_dk"])
@@ -298,11 +306,12 @@ class LdaSampler(object):
             	self.post_B.append(self.B)
             	self.post_Sigma.append(self.Sigma)
 
-
-D = 200 	#number of documents
-K = 10 		#number of topics
-P = 4		#number of covariates
-V = 100		#number of vocabularies
+#####  Modify below for different experiment ##########
+#######################################################
+D = 200     #number of documents
+K = 10      #number of topics
+P = 4       #number of covariates
+V = 200     #number of vocabularies
 
 
 # {"X":X, "Sigma":Sigma, "B":B, "Phi":Phi, "DocTopic":DocTopic, "DTM":DTM}
@@ -311,10 +320,11 @@ Psi_try = datasets.make_spd_matrix(K-1)
 B0_try = np.zeros((P,K-1))
 sampler = LdaSampler(n_topics=K, beta=2, psi=Psi_try, design_matrix=simul["X"], B0=B0_try)
 
-sampler.run(simul["DTM"], maxiter=20000, 10000)
+#pdb.set_trace()
+Final_posterior = sampler.run(DTM=simul["DTM"], maxiter=200000, burnin=10000)
 
 Final_posterior = (sampler.post_z, sampler.post_eta, sampler.post_lamb, sampler.post_B, sampler.post_Sigma)
 
-with open("/Users/munjichoi/Google Drive/Research/Scalable STM","wb") as f:
+with open("home/munjic/ScalableSTM","wb") as f:
     pickle.dump(Final_posterior, f)
 
