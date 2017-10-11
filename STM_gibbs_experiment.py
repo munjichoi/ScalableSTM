@@ -19,7 +19,7 @@ import pdb
 
 
 
-def gen_documents(N_documents, N_topics, N_covariates, N_voca):
+def gen_documents(N_documents, N_topics, N_covariates, N_voca, N_length):
 	
 	Psi = datasets.make_spd_matrix(N_topics-1)
 	nu  = N_topics+1
@@ -27,7 +27,7 @@ def gen_documents(N_documents, N_topics, N_covariates, N_voca):
 	beta = 3
 	
 	X = np.random.normal(0,1, N_documents*N_covariates).reshape((N_documents, N_covariates))
-	Nd = np.random.poisson(1000, size=N_documents)
+	Nd = np.random.poisson(N_length, size=N_documents)
 
 	#Global Parameters
 	Sigma = sp.stats.invwishart.rvs(df=nu, scale=Psi, size=1) # covariance matrix
@@ -312,10 +312,11 @@ D = 200     #number of documents
 K = 10      #number of topics
 P = 4       #number of covariates
 V = 200     #number of vocabularies
+Nd= 1000
 
 
 # {"X":X, "Sigma":Sigma, "B":B, "Phi":Phi, "DocTopic":DocTopic, "DTM":DTM}
-simul = gen_documents(D,K,P,V)
+simul = gen_documents(D,K,P,V, Nd)
 Psi_try = datasets.make_spd_matrix(K-1)
 B0_try = np.zeros((P,K-1))
 sampler = LdaSampler(n_topics=K, beta=2, psi=Psi_try, design_matrix=simul["X"], B0=B0_try)
