@@ -48,8 +48,8 @@ def gen_documents(N_documents, N_topics, N_covariates, N_voca, N_length):
 		theta = np.exp(eta)/sum(np.exp(eta))
 		WordTopic = np.zeros(Nd[d])
 		for i in xrange(Nd[d]):
-			z = np.random.multinomial(1, theta).nonzero()[0]   # zth topic among K
-			w = np.random.multinomial(1, Phi[z].reshape(N_voca)).nonzero()[0] # vth word among V
+			z = np.random.multinomial(1, theta).argmax()   # zth topic among K
+			w = np.random.multinomial(1, Phi[z].reshape(N_voca)).argmax() # vth word among V
 			DTM[d, w] += 1
 			WordTopic[i] = z
 
@@ -95,14 +95,13 @@ class LdaSampler(object):
     def _initialize(self, DTM):
     	
         n_docs, vocab_size = DTM.shape
-
         
         
         # collection of logistic normal values
         self.eta = np.zeros((n_docs, self.n_topics)) # per each document
         self.lamb = np.zeros((n_docs, self.n_topics)) # per each document
         # topic of each word in the entire corpus
-        self.topics = {}
+        self.topics = range(n_docs)
         
         # number of times topic z occurs in document d
         self.ndk = np.zeros((n_docs, self.n_topics))
@@ -140,6 +139,8 @@ class LdaSampler(object):
             self.lamb[d, np.arange(self.n_topics-1)] = np.repeat(self.pg.pgdraw(1, 0), self.n_topics-1)
             self.lamb[d, self.n_topics-1] = 0
 
+            topics = []
+
             # i is a number between 0 and doc_length-1
             # v is a number between 0 and vocab_size-1
             for i, v in enumerate(dtm_to_words(DTM[d, :])):
@@ -150,7 +151,9 @@ class LdaSampler(object):
                 self.nd[d] += 1
                 self.nkv[z,v] += 1
                 self.nk[z] += 1
-                self.topics[(d,i)] = z
+                topics.append(z)
+
+            self.topics[d] = topics
 
         """
         This calculates posterior p(z_dn|...) (K dimensional multinomial parameter)
@@ -167,7 +170,7 @@ class LdaSampler(object):
         
         vocab_size = self.nkv.shape[1]
         
-        z = self.topics[(d,i)] #topic of w_di
+        z = self.topics[d][i] #topic of w_di
         self.ndk[d,z] -= 1
         self.nd[d] -= 1
         self.nkv[z,v] -= 1
@@ -276,13 +279,13 @@ class LdaSampler(object):
                     
                     #update z_di
                     p_z = self._conditional_dist_topics(d, i, v)
-                    z = np.random.multinomial(1, p_z).nonzero()[0]
+                    z = np.random.multinomial(1, p_z).argmax()
 
                     self.ndk[d,z] += 1
                     self.nd[d] += 1
                     self.nkv[z,v] += 1
                     self.nk[z] += 1
-                    self.topics[(d,i)] = z
+                    self.topics[d][i] = z
 
                 #document-topic level parameters
                 for k in xrange(self.n_topics-2):                    
@@ -329,8 +332,12 @@ sampler = LdaSampler(n_topics=K, beta=2, psi=Psi_try, design_matrix=simul["X"], 
 #pdb.set_trace()
 Final_posterior = sampler.run(DTM=simul["DTM"], maxiter=10, burnin=0)
 
-Final_posterior = (sampler.post_z, sampler.post_eta, sampler.post_lamb, sampler.post_B, sampler.post_Sigma)
+Final_result = (sampler.post_z, sampler.post_eta, sampler.post_lamb, sampler.post_B, sampler.post_Sigma)
 
-with open("home/munjic/ScalableSTM","wb") as f:
-    pickle.dump(Final_posterior, f)
+with open("Final_result","wb") as f:
+    pickle.dump(Final_result, f)
+
+with open("True_Values","wb") as f:
+    pickle.dump(simul, f)
+
 
