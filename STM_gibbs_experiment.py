@@ -261,12 +261,12 @@ class LdaSampler(object):
 
 
         for it in xrange(maxiter):
-            if it % 500 == 0:
-                print it
-            else:
-                pass
+            # if it % 500 == 0:
+            #     print it
+            # else:
+            #     pass
 
-            #print it
+            print it
             for d in xrange(n_docs):
                 #print d
                 #document-word level parameters
