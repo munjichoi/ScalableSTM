@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH -t 10:00:00
+#SBATCH -t 120:00:00
 #SBATCH -J simulation
 #SBATCH -o log.%j
 #SBATCH --mail-type=begin
