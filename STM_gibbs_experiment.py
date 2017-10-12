@@ -327,7 +327,7 @@ B0_try = np.zeros((P,K-1))
 sampler = LdaSampler(n_topics=K, beta=2, psi=Psi_try, design_matrix=simul["X"], B0=B0_try)
 
 #pdb.set_trace()
-Final_posterior = sampler.run(DTM=simul["DTM"], maxiter=200000, burnin=10000)
+Final_posterior = sampler.run(DTM=simul["DTM"], maxiter=10, burnin=0)
 
 Final_posterior = (sampler.post_z, sampler.post_eta, sampler.post_lamb, sampler.post_B, sampler.post_Sigma)
 
