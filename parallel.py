@@ -11,7 +11,9 @@ from sklearn import datasets
 from pypolyagamma import PyPolyaGamma
 import cPickle as pickle
 import pdb
-import line_profiler
+#import line_profiler
+import time
+from pathos.multiprocessing import ProcessingPool as Pool
 
 ######### See the bottom lines for simulation ##########
 #  You also need to specify directory path to save the results
@@ -39,7 +41,7 @@ def gen_documents(N_documents, N_topics, N_covariates, N_voca, N_length):
 
 	Phi = np.random.dirichlet(alpha=np.repeat(beta, N_voca), size=N_topics)
 
-	DTM = np.zeros((N_documents, N_voca))
+	DTM = np.zeros((N_documents, N_voca), dtype=int)
 	DocTopic = []
 
 	#document level parameters
@@ -92,7 +94,7 @@ class LdaSampler(object):
         self.B0 = B0
         self.X = design_matrix
 
-    @profile
+    # @profile
     def _initialize(self, DTM):
     	
         n_docs, vocab_size = DTM.shape
@@ -127,14 +129,22 @@ class LdaSampler(object):
         vec_B = np.random.multivariate_normal(vec_B0, kr_SigLamb)
         self.B = vec_B.reshape(self.B0.shape)
         self.pg= PyPolyaGamma(seed=0)
-        ##Make eta part as one-shot operation
+        
+        
+        self.XB = np.dot(self.X, self.B)
+        vec_XB = np.ravel(self.XB)
+        kr_Sigeta = np.kron(self.Sigma, np.identity(n_docs))
+        vec_eta = np.random.multivariate_normal(vec_XB, kr_Sigeta)
+        self.eta[:, np.arange(self.n_topics-1)] = vec_eta.reshape((n_docs, self.n_topics-1))
+
+        
         for d in xrange(n_docs):
             
             # document level parameters - topic-prevalence eta
-            eta_d_mean = np.dot(self.X[d, :], self.B)
-            eta_d = np.random.multivariate_normal(eta_d_mean, self.Sigma) 
-            eta_d = np.append(eta_d, 0)
-            self.eta[d, :] = eta_d
+            # eta_d_mean = self.XB[d,:]
+            # eta_d = np.random.multivariate_normal(eta_d_mean, self.Sigma) 
+            # eta_d = np.append(eta_d, 0)
+            # self.eta[d, :] = eta_d
 
             
             self.lamb[d, np.arange(self.n_topics-1)] = np.repeat(self.pg.pgdraw(1, 0), self.n_topics-1)
@@ -161,7 +171,7 @@ class LdaSampler(object):
         Use the result of this function to sample z. 
      	Then add 1 to corresponding frequency matrices
         """
-    @profile
+    # @profile
     def _conditional_dist_topics(self, d, i, v):
         """
         d : index of documents (0~D-1)
@@ -169,7 +179,8 @@ class LdaSampler(object):
         v : which voca word_di is 
         Conditional distribution of Z (vector of size n_topics = K).
         """
-        
+        t0=time.time()
+        temp_eta = self.eta.T
         vocab_size = self.nkv.shape[1]
         
         z = self.topics[d][i] #topic of w_di
@@ -180,19 +191,23 @@ class LdaSampler(object):
         
         left = (self.nkv[:,v] + self.beta) / \
                (self.nk + self.beta * vocab_size)
-        right = np.exp(self.eta[d, :] )/np.exp(self.eta[d, :]).sum(axis=1)
+        #right = np.exp(temp_eta[:,d] )/np.exp(temp_eta[:,d]).sum()
+        right = np.exp(temp_eta[:,d] )
         p_z = left * right
         # normalize to obtain probabilities
-        psum = np.sum(p_z, axis=1)
-        p_z /= psum 
-        # p_z = np.repeat(0.1, 9)/0.9
+        p_z /= p_z.sum()
+        t1=time.time()
+        print("iner", "d=", d, "i=", i, t1-t0)
         return p_z
+
+    # def _cdtopics_unpack(self, args):
+    #     return self._conditional_dist_topics(*args)
 
         """
         This calculates mean and variance of eta_dk posterior (univariate normal) 
         & polygamma variable lambda_dk
         """
-    @profile
+    # @profile
     def _conditional_dist_logitnormal(self, d, k):
         """
         Conditional distribution of eta_dk (size of k-1 = kth elements is fixed to be zero)
@@ -208,7 +223,7 @@ class LdaSampler(object):
     	mu_dk = XB[d, k] - sigmasq_k*\
     		np.dot(self.Sigma_inv[np.arange(self.n_topics-1)!=k, np.arange(self.n_topics-1)!=k], eta_d_k - XB[d, np.arange(self.n_topics-1)!=k])
     	kappa_dk = self.ndk[d,k] - self.nd[d]/2
-    	zeta_dk =np.log(np.sum(np.exp(eta_d_k))) 
+    	zeta_dk =np.log(sum(np.exp(eta_d_k))) 
 
     	# mean / var of eta_dk's posterior distribution (gamma, tau)
     	tausq_dk = 1/(self.lamb[d,k] + 1/sigmasq_k)
@@ -226,7 +241,7 @@ class LdaSampler(object):
         """
         This calculates posterior mean and cov of B (matrix multivariate normal)
         """
-    @profile
+    # @profile
     def _conditional_dist_topicprev(self):
         """
         <part1>
@@ -246,7 +261,7 @@ class LdaSampler(object):
         
         return {"Mean_newB":Mean_newB, "Scale_newSigma":Scale_newSigma}
 
-    @profile
+    # @profile
     def run(self, DTM, maxiter, burnin):
         """
         Run the Gibbs sampler.
@@ -267,6 +282,8 @@ class LdaSampler(object):
         self.post_B = []
         self.post_Sigma = []
 
+        pool = Pool(4)
+
 
 
         for it in xrange(maxiter):
@@ -279,13 +296,20 @@ class LdaSampler(object):
             for d in xrange(n_docs):
                 #print d
                 #document-word level parameters
+                t2=time.time()
+                i = np.arange(int(self.nd[d]))
+                v = dtm_to_words(DTM[d,:])
+                d2 =np.repeat(d, int(self.nd[d]))
+                p_z_all = pool.map(self._conditional_dist_topics, d2, i, v)
+                t3=time.time()
+                print("middle", d, t2, t3, t3-t2)
                 for i, v in enumerate(dtm_to_words(DTM[d, :])):
                     # i is a number between 0 and doc_length-1
                     # v is a number between 0 and vocab_size-1
                     
                     #update z_di
-                    p_z = self._conditional_dist_topics(d, i, v)
-                    z = np.random.multinomial(1, p_z).argmax()
+                    #p_z = self._conditional_dist_topics(d, i, v)
+                    z = np.random.multinomial(1, p_z_all[i]).argmax()
 
                     self.ndk[d,z] += 1
                     self.nd[d] += 1
@@ -302,6 +326,8 @@ class LdaSampler(object):
 
                 self.eta[d, self.n_topics-1] = 0
                 self.lamb[d, self.n_topics-1] = 0
+                t4=time.time()
+                print("out", d, t2, t3, t4, t4-t2)
 
             #global parameter
             BSigma_post = self._conditional_dist_topicprev()
@@ -322,7 +348,7 @@ class LdaSampler(object):
 
 #####  Modify below for different experiment ##########
 #######################################################
-D = 200     #number of documents
+D = 5     #number of documents
 K = 10      #number of topics
 P = 4       #number of covariates
 V = 200     #number of vocabularies
@@ -340,8 +366,8 @@ Final_posterior = sampler.run(DTM=simul["DTM"], maxiter=1, burnin=0)
 
 Final_result = (sampler.post_z, sampler.post_eta, sampler.post_lamb, sampler.post_B, sampler.post_Sigma)
 
-# with open("Final_result","wb") as f:
-#     pickle.dump(Final_result, f)
+with open("Final_result","wb") as f:
+     pickle.dump(Final_result, f)
 
 # with open("True_Values","wb") as f:
 #     pickle.dump(simul, f)

@@ -127,14 +127,22 @@ class LdaSampler(object):
         vec_B = np.random.multivariate_normal(vec_B0, kr_SigLamb)
         self.B = vec_B.reshape(self.B0.shape)
         self.pg= PyPolyaGamma(seed=0)
-        ##Make eta part as one-shot operation
+        
+        
+        self.XB = np.dot(self.X, self.B)
+        vec_XB = np.ravel(self.XB)
+        kr_Sigeta = np.kron(self.Sigma, np.identity(n_docs))
+        vec_eta = np.random.multivariate_normal(vec_XB, kr_Sigeta)
+        self.eta[:, np.arange(self.n_topics-1)] = vec_eta.reshape((n_docs, self.n_topics-1))
+
+        
         for d in xrange(n_docs):
             
             # document level parameters - topic-prevalence eta
-            eta_d_mean = np.dot(self.X[d, :], self.B)
-            eta_d = np.random.multivariate_normal(eta_d_mean, self.Sigma) 
-            eta_d = np.append(eta_d, 0)
-            self.eta[d, :] = eta_d
+            # eta_d_mean = self.XB[d,:]
+            # eta_d = np.random.multivariate_normal(eta_d_mean, self.Sigma) 
+            # eta_d = np.append(eta_d, 0)
+            # self.eta[d, :] = eta_d
 
             
             self.lamb[d, np.arange(self.n_topics-1)] = np.repeat(self.pg.pgdraw(1, 0), self.n_topics-1)
@@ -169,7 +177,7 @@ class LdaSampler(object):
         v : which voca word_di is 
         Conditional distribution of Z (vector of size n_topics = K).
         """
-        
+        temp_eta = self.eta.T
         vocab_size = self.nkv.shape[1]
         
         z = self.topics[d][i] #topic of w_di
@@ -180,12 +188,11 @@ class LdaSampler(object):
         
         left = (self.nkv[:,v] + self.beta) / \
                (self.nk + self.beta * vocab_size)
-        right = np.exp(self.eta[d, :] )/np.exp(self.eta[d, :]).sum(axis=1)
+        #right = np.exp(temp_eta[:,d] )/np.exp(temp_eta[:,d]).sum()
+        right = np.exp(temp_eta[:,d] )
         p_z = left * right
         # normalize to obtain probabilities
-        psum = np.sum(p_z, axis=1)
-        p_z /= psum 
-        # p_z = np.repeat(0.1, 9)/0.9
+        p_z /= p_z.sum()
         return p_z
 
         """
@@ -208,7 +215,7 @@ class LdaSampler(object):
     	mu_dk = XB[d, k] - sigmasq_k*\
     		np.dot(self.Sigma_inv[np.arange(self.n_topics-1)!=k, np.arange(self.n_topics-1)!=k], eta_d_k - XB[d, np.arange(self.n_topics-1)!=k])
     	kappa_dk = self.ndk[d,k] - self.nd[d]/2
-    	zeta_dk =np.log(np.sum(np.exp(eta_d_k))) 
+    	zeta_dk =np.log(sum(np.exp(eta_d_k))) 
 
     	# mean / var of eta_dk's posterior distribution (gamma, tau)
     	tausq_dk = 1/(self.lamb[d,k] + 1/sigmasq_k)

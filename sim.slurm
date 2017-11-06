@@ -18,4 +18,4 @@ echo '-------------------------------'
 echo -e '\n'
 
 srun module load anaconda
-srun STM_gibbs_exeriment.py
+srun python parallel.py
