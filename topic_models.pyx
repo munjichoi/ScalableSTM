@@ -23,7 +23,7 @@ from pypolyagamma import PyPolyaGamma
 
 # we choose this number since it is a large prime
 cdef unsigned int n_rands = 1000003
-cdef gsl_rng *r = gsl_rng_alloc(gsl_rng_mt19937)
+#cdef gsl_rng *r = gsl_rng_alloc(gsl_rng_mt19937)
 
 
 cdef double[:] create_rands(unsigned int n_rands, seed=None):
