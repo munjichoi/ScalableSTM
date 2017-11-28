@@ -1,0 +1,6 @@
+STMPG_cscript.c
+setup.py
+stmpg.egg-info/PKG-INFO
+stmpg.egg-info/SOURCES.txt
+stmpg.egg-info/dependency_links.txt
+stmpg.egg-info/top_level.txt
