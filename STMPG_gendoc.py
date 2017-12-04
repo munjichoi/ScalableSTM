@@ -20,10 +20,10 @@ def gen_documents(N_documents, N_topics, N_covariates, N_voca, N_length):
 
 	Psi = datasets.make_spd_matrix(N_topics-1)
 	nu  = N_topics+1
-	B0  = np.zeros((N_covariates,N_topics-1))
+	B0  = np.random.normal(3,2, N_covariates*(N_topics-1) ).reshape((N_covariates,N_topics-1))
 	beta = 3
 
-	X = np.random.normal(0,1, N_documents*N_covariates).reshape((N_documents, N_covariates))
+	X = np.random.normal(5,2, N_documents*N_covariates).reshape((N_documents, N_covariates))
 	Nd = np.random.poisson(N_length, size=N_documents)
 
 	#Global Parameters
