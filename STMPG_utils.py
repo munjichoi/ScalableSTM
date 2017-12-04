@@ -54,11 +54,11 @@ def dtm_to_lists(dtm):
 
     n_tokens = int(dtm.sum())
     #doc_lookup = np.repeat(docs, ss).astype(np.int32)
-    doc_lookup = np.repeat(docs, ss).astype(np.int32)
+    doc_lookup = np.repeat(docs, ss).astype(np.intc)
     print doc_lookup.dtype
-    term_lookup = np.empty(n_tokens, dtype=np.int32)
+    term_lookup = np.empty(n_tokens, dtype=np.intc)
     startidx = 0
-    for i, cnt in enumerate(terms):
+    for i, cnt in enumerate(ss):
         cnt = int(cnt)
         term_lookup[startidx:startidx + cnt] = terms[i]
         startidx += cnt

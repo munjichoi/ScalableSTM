@@ -140,10 +140,10 @@ def gibbs_sampler_STM_PG(int n_iter, int burnin, int n_report_iter,
     pg_rng = PyPolyaGamma(seed=seed)
 
     start_time = datetime.now()
-    print('{} start iterations'.format(start_time))
+    #print('{} start iterations'.format(start_time))
 
     for it in range(n_iter):
-        #print('{} iter'.format(it))
+        # print('{} iter'.format(it))
         printf("iter is %d \n", it)
         # sample z
         for i in range(n_tokens):
@@ -186,35 +186,41 @@ def gibbs_sampler_STM_PG(int n_iter, int burnin, int n_report_iter,
                 
                 #fix k_indices
                 k_indices = np.delete(np.arange(n_topics-1), k)
-                # print("k_indices={}".format(k_indices))
+                # print("k_indices=", np.asarray(k_indices))
+                #print("k_indices=", k_indices)
                 eta_sum = 0.
                 dot_Sig_eXB = 0.
 
                 eXB = np.empty(n_topics-1, dtype=np.float64, order='C')
                 for i in k_indices:
-                    # print("i={}".format(i))
+                    #print("i={}".format(i))
+                    #print("eta[d, i]={}".format(eta[d, i]))
                     eta_sum += exp(eta[d, i])
-                    # print("eta_sum={}".format(eta_sum))
-                    eXB[i] = eta[d, i] - XB[d, i] #fix initial values for eta
-                    # print("eta[d, i]={}".format(eta[d, i]))
-                    # print("XB[d, i]={}".format(XB[d, i]))
-                    # print("eXB[i]={}".format(eXB[i]))
+                    #print("XB[d, i]={}".format(XB[d, i]))
 
+                    #print("eta_sum={}".format(eta_sum))
+                    eXB[i] = eta[d, i] - XB[d, i] #fix initial values for eta
+                    #print("eXB[i]={}".format(eXB[i]))
+
+                # print("eXB=", np.asarray(eXB))
+                # print("Sigma_inv[k, ]=", np.asarray(Sigma_inv[k, ]) )
+                
                 for j in k_indices:
                     dot_Sig_eXB += Sigma_inv[k, j]*eXB[j]
-                    # print("j={}".format(j))
-                    # print("Sigma_inv[k, j]={}".format(Sigma_inv[k,j]))
-                    # print("dot_Sig_eXB={}".format(dot_Sig_eXB))
+                    #print("j={}".format(j))
+                    #print("Sigma_inv[k, j]={}".format(Sigma_inv[k,j]))
+                    #print("dot_Sig_eXB={}".format(dot_Sig_eXB))
 
+                # print("dot_Sig_eXB {}".format(dot_Sig_eXB))
 
                 #print("eta part runs")
 
                 sigmasq_k = 1/Sigma_inv[k,k]
 
-                #printf("sigmasq_k is %f \n", sigmasq_k)
+                # printf("sigmasq_k is %f \n", sigmasq_k)
 
                 mu_dk = XB[d, k] - sigmasq_k*dot_Sig_eXB
-                #printf("mu_dk for doc %d, topic %d is %f \n", d, k, mu_dk)
+                # printf("mu_dk for doc %d, topic %d is %f \n", d, k, mu_dk)
 
                 kappa_dk = ndz[d,k] - nd[d]/2
 
@@ -223,20 +229,23 @@ def gibbs_sampler_STM_PG(int n_iter, int burnin, int n_report_iter,
                 #printf("zeta_dk is %f \n", zeta_dk) 
 
                 # mean / var of eta_dk's posterior distribution (gamma, tau)
-                tausq_dk = 1/(lamb[d,k] + 1/sigmasq_k)
+                tausq_dk = 1/(lamb[d,k] + Sigma_inv[k,k])
                 #printf("tausq_dk for doc %d, topic %d is %f \n", d, k, tausq_dk) 
-                gamma_dk = tausq_dk*(kappa_dk + lamb[d,k]*zeta_dk + mu_dk/sigmasq_k)
+                gamma_dk = tausq_dk*(kappa_dk + lamb[d,k]*zeta_dk + mu_dk*Sigma_inv[k,k])
                 
-                #print("doc is {}".format(d))
-                #print("topic is {}".format(k))
+                # print("doc is {}".format(d))
+                # print("topic is {}".format(k))
+                
+                # print("eta_d=", np.asarray(eta[d, :]))
                 # print("eta_sum = {}".format(eta_sum))
-                # print("max eta_d = {}".format(max(eta[d, :])))
                 # print("sigmasq_k = {}".format(sigmasq_k))
+                # print("mu_dk={}".format(mu_dk))
+                # print("zeta_dk = {}".format(zeta_dk))
                 # print("lamb[d, k] = {}".format(lamb[d,k]))
                 # print("mu_dk/sigmasq_k= = {}".format(mu_dk/sigmasq_k))
                 # print("gamma_dk= = {}".format(gamma_dk))
                 # print("tausq_dk= = {}".format(tausq_dk))
-                # print("kappa_dk= = {}".format(kappa_dk))
+                # # #print("kappa_dk= = {}".format(kappa_dk))
 
                 
                 # if eta_sum>=1000000000000000000000000000000000000000000000000000:
@@ -252,6 +261,7 @@ def gibbs_sampler_STM_PG(int n_iter, int burnin, int n_report_iter,
             
 
                 # Polyagamma parameters
+                # print("eta_dk={}".format(eta[d,k]))
                 rho_dk = eta[d,k] - zeta_dk
                 #printf("rho_dk is %f \n", rho_dk)
                 # print("rho_dk={}".format(rho_dk))
@@ -259,7 +269,7 @@ def gibbs_sampler_STM_PG(int n_iter, int burnin, int n_report_iter,
                 eta[d, k] = gaussian(r, tausq_dk) 
                 #printf("new eta is before gamma is %f \n", eta[d, k])
                 eta[d, k ] +=gamma_dk
-                
+                # print("new eat_dk={}".format(eta[d,k]))
                 #printf("gaussian ok for doc %d, topic %d \n", d, k)
                 lamb[d, k] = pg_rng.pgdraw(nd[d], rho_dk)
                 #printf("pgdraw ok for doc %d, topic %d \n", d, k)
@@ -267,9 +277,9 @@ def gibbs_sampler_STM_PG(int n_iter, int burnin, int n_report_iter,
             
 
 
-
-
-        # Update Global Parameters
+        # print("new eta is =", np.asarray(eta))
+        # print("Sigma_inv=", np.asarray(Sigma_inv))
+        # # Update Global Parameters
         for k in xrange(n_topics-1):
             eta_sub[:,k] = eta[:,k]
 
@@ -298,7 +308,7 @@ def gibbs_sampler_STM_PG(int n_iter, int burnin, int n_report_iter,
         ln_likeli[it] = log_likelihood(beta, beta_sum, lbeta_w,
                                         eta, nzw, ndz, nz)
 
-
+        # print("iter=", it, ", ln_lkeli=", ln_likeli[it])
         if it < burnin :
             pass
         

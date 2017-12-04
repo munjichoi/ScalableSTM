@@ -38,11 +38,13 @@ def gen_documents(N_documents, N_topics, N_covariates, N_voca, N_length):
 
 	DTM = np.zeros((N_documents, N_voca), dtype=np.int32)
 	DocTopic = []
+	vec_eta_mean = np.ravel(np.dot(X, B))
+	kr_eta = np.kron(Sigma, np.identity(N_documents))
+	eta = np.random.multivariate_normal(vec_eta_mean, kr_eta).reshape((N_documents, N_topics-1))
 
 	#document level parameters
 	for d in xrange(N_documents):
-		eta = np.append(XB[d, :], 0)
-		theta = np.exp(eta)/sum(np.exp(eta))
+		theta = np.exp(eta[d, :])/sum(np.exp(eta[d, :]))
 		WordTopic = np.zeros(Nd[d])
 		for i in xrange(Nd[d]):
 			z = np.random.multinomial(1, theta).argmax()   # zth topic among K
@@ -51,7 +53,8 @@ def gen_documents(N_documents, N_topics, N_covariates, N_voca, N_length):
 			WordTopic[i] = z
 
 		DocTopic.append(WordTopic)
-	result = {"X":X, "Sigma":Sigma, "B":B, "Phi":Phi, "DocTopic":DocTopic, "DTM":DTM}
+	result = {"X":X, "Sigma":Sigma, "eta":eta, "B":B, "Phi":Phi, "DocTopic":DocTopic, "DTM":DTM,
+				"Psi":Psi, "B0":B0, "beta":beta, "nu":nu}
 	
 	
 	return result
